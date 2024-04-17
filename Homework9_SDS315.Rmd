@@ -1,0 +1,121 @@
+---
+title: "Homework3_SDS315"
+author: "Caroline Zhuang"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  pdf_document:
+    toc: yes
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(fig.height=3, fig.width=4, warning = FALSE)
+library(tidyverse)
+library(ggplot2)
+library(mosaic)
+library(MatchIt)
+
+turnout <- read.csv('turnout.csv')
+solder <- read.csv('solder.csv')
+```
+
+# **Problem 1** 
+
+## **Part A**
+```{r, echo = FALSE}
+xtabs(~voted1998 + GOTV_call, data = turnout) %>%
+  prop.table(margin = 2) %>%
+  round(3)
+
+prop(voted1998 ~ GOTV_call, data = turnout)
+diffprop(voted1998 ~ GOTV_call, data = turnout)
+boot_vote = do(10000) * diffprop(voted1998 ~ GOTV_call, data = mosaic::resample(turnout))
+confint(boot_vote, level = 0.95)
+
+```
+The proportion of people who received a call and voted in 1998 is 0.65. The proportion of people who did not receive a call and still voted is 0.44. The 95% confidence interval for the difference in proportions between people who received a call and people who didn't is (0.14, 0.26). Since the entire interval is above zero, this is evidence that people who received a GOTV call were more likely to vote (between 14% and 26% more likely).  
+
+## **Part B**
+```{r, echo = FALSE}
+lm_novar = lm(voted1998 ~ GOTV_call, data = turnout)
+coef(lm_novar)
+
+lm_voting = lm(voted1998 ~ GOTV_call + voted1996, data = turnout)
+coef(lm_voting)
+
+lm_age = lm(voted1998 ~ GOTV_call + AGE, data = turnout)
+coef(lm_age)
+
+lm_majorpty = lm(voted1998 ~ GOTV_call + MAJORPTY, data = turnout)
+coef(lm_majorpty)
+```
+
+* The coefficient of GOTV_call for the linear model between voted1998 and GOTV_call is 0.204. When the variable voted1996 is factored in, the coefficient changes to 0.129. The coefficient for voted1996 is 0.41, meaning that voted1996 affects whether people voted in 1998. 
+
+* When age is accounted, The coefficient of GOTV_call changes 0.138 while the coefficient of AGE is 0.007, meaning that AGE affects whether people voted in 1998. 
+
+* When the variable MAJORPTY is included, The coefficient of GOTV_call changes to 0.196 while the coefficient of MAJORPTY is 0.131, meaning that MAJORPTY affects whethe people voted in 1998. 
+
+## **PART C**
+```{r, echo = FALSE}
+vote_matched = matchit(GOTV_call ~ voted1998 + voted1996 + AGE + MAJORPTY, data = turnout, ratio = 5) %>%
+  match.data
+mean(voted1996 ~ GOTV_call, data= vote_matched)
+xtabs(~ voted1996 + GOTV_call, data = vote_matched) %>%
+  prop.table(margin=2) 
+mean(AGE ~ GOTV_call, data= vote_matched)
+xtabs(~ MAJORPTY + GOTV_call, data = vote_matched) %>%
+  prop.table(margin=2) 
+```
+As you can see for each confounding variable, the means are around the same for if they voted in 1998 or if they didn't. This means that the data set is balanced. 
+
+```{r, echo = FALSE}
+prop(GOTV_call ~ voted1998, data = vote_matched)
+boot_votematch = do(10000) * diffprop(voted1998 ~ GOTV_call, data = mosaic::resample(vote_matched))
+confint(boot_votematch, level = 0.95)
+```
+
+* The proportion of those receiving a GOTV call who voted in 1998 is 0.1668
+* The proportion of those not receiving a GOTV call but still voted is 0.166
+* The 95% confidence interval for the difference in these two proportions is -0.065 to 0.065. 
+
+Because the 95% confidence interval now includes zero, we can conclude that the GOTV call does not have much effect on the likelihood of voting in the 1998 election. This confidence interval is different from the one found in Part A because we accounted for all the confounding variables which affected the proportion of those who voted in the 1998 election. 
+
+# **Problem 2** 
+## **Part A**
+```{r, echo = FALSE}
+ggplot(solder) + 
+  geom_jitter(aes(x = Opening, y = skips), color = 'hotpink')
+```
+
+As you can see from the graph, a S opening has a much wider range of number of skips compared to L and M. For the opening L, the dots are mainly concentrated at 0 skips. For size M, the dots are less concentrated but still more than size S.  
+
+```{r, echo = FALSE}
+ggplot(solder) + 
+  geom_jitter(aes(x = Solder, y = skips), color = 'hotpink')
+```
+
+As you can see from the plot above, the thin solder has a much wider range of amount of skips compared to the thick solder. The thick solder is mainly concentrated at around 0 with the maximum being 30, compared to the thin solder which has a max of around 50. 
+
+## **Part B**
+```{r, echo = FALSE}
+solder = mutate(solder, Solder = factor(Solder))
+solder = mutate(solder, Opening = factor(Opening))
+lm_skips = lm(skips ~ Solder + Opening + Solder:Opening, data = solder)
+coef(lm_skips) %>%
+  round(2)
+confint(lm_skips)
+```
+
+
+## **Part C** 
+* The baseline skips is when the Solder is thick and the Opening is large, which is 0.39. 
+* The main effect for when the Solder is thin is 2.28 skips. This is the effect of SolderThin in isolation 
+* The main effect for when the Opening is medium is 2.41 skips. This is the effect of OpeningM in isolation
+* The main effect for when the Opening is small is 5.13 skips. This is the effect of OpeningS in isolation 
+* The interaction effect for SolderThin and OpeningM is -0.74 skips. In other words, when the solder is thin and the opening is medium, the skips are 0.74 less than what you would expect from summing the individual "isolated" effects of the two variables.
+* The interaction effect for SolderThin and Opening S is 9.65 skips. In other words, when the solder is thin and the opening is small, the skips are 9.65 skips more than what you would expect from summing the individual "isolated" effects of the two variables. 
+
+## **Part D** 
+If I had to recommend any combination of Opening size and Solder thickness, I would recommend a thin solder and a medium opening. This is because the interaction effect between those two is negative meaning the skips are less than what you would expect. Since AT&T wants to minimize the amount of skips, this combination is the best way to do so as having a thin solder and small opening has an effect of 9.65 skips and the basline is 0.39. 
